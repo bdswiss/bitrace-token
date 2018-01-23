@@ -1,6 +1,60 @@
 pragma solidity ^0.4.18;
 
 
+contract ERC20Basic {
+  uint256 public totalSupply;
+  function balanceOf(address who) public view returns (uint256);
+  function transfer(address to, uint256 value) public returns (bool);
+  event Transfer(address indexed from, address indexed to, uint256 value);
+}
+
+contract ERC20 is ERC20Basic {
+  function allowance(address owner, address spender) public view returns (uint256);
+  function transferFrom(address from, address to, uint256 value) public returns (bool);
+  function approve(address spender, uint256 value) public returns (bool);
+  event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+
+
+/**
+ * @title Basic token
+ * @dev Basic version of StandardToken, with no allowances.
+ */
+contract BasicToken is ERC20Basic {
+  using SafeMath for uint256;
+
+  mapping(address => uint256) balances;
+
+  /**
+  * @dev transfer token for a specified address
+  * @param _to The address to transfer to.
+  * @param _value The amount to be transferred.
+  */
+  function transfer(address _to, uint256 _value) public returns (bool) {
+    require(_to != address(0));
+    require(_value <= balances[msg.sender]);
+
+    // SafeMath.sub will throw if there is not enough balance.
+    balances[msg.sender] = balances[msg.sender].sub(_value);
+    balances[_to] = balances[_to].add(_value);
+    Transfer(msg.sender, _to, _value);
+    return true;
+  }
+
+  /**
+  * @dev Gets the balance of the specified address.
+  * @param _owner The address to query the the balance of.
+  * @return An uint256 representing the amount owned by the passed address.
+  */
+  function balanceOf(address _owner) public view returns (uint256 balance) {
+    return balances[_owner];
+  }
+
+}
+
+
+
 /**
  * @title Ownable
  * @dev The Ownable contract has an owner address, and provides basic authorization control
@@ -42,6 +96,13 @@ contract Ownable {
   }
 
 }
+
+
+
+
+
+
+
 
 /**
  * @title SafeMath
@@ -180,6 +241,10 @@ contract Crowdsale {
 }
 
 
+
+
+
+
 /**
  * @title CappedCrowdsale
  * @dev Extension of Crowdsale with a max amount of funds raised
@@ -209,6 +274,16 @@ contract CappedCrowdsale is Crowdsale {
   }
 
 }
+
+
+
+
+
+
+
+
+
+
 
 /**
  * @title FinalizableCrowdsale
@@ -246,57 +321,6 @@ contract FinalizableCrowdsale is Crowdsale, Ownable {
 }
 
 
-/**
- * @title RefundVault
- * @dev This contract is used for storing funds while a crowdsale
- * is in progress. Supports refunding the money if crowdsale fails,
- * and forwarding it if crowdsale is successful.
- */
-contract RefundVault is Ownable {
-  using SafeMath for uint256;
-
-  enum State { Active, Refunding, Closed }
-
-  mapping (address => uint256) public deposited;
-  address public wallet;
-  State public state;
-
-  event Closed();
-  event RefundsEnabled();
-  event Refunded(address indexed beneficiary, uint256 weiAmount);
-
-  function RefundVault(address _wallet) public {
-    require(_wallet != address(0));
-    wallet = _wallet;
-    state = State.Active;
-  }
-
-  function deposit(address investor) onlyOwner public payable {
-    require(state == State.Active);
-    deposited[investor] = deposited[investor].add(msg.value);
-  }
-
-  function close() onlyOwner public {
-    require(state == State.Active);
-    state = State.Closed;
-    Closed();
-    wallet.transfer(this.balance);
-  }
-
-  function enableRefunds() onlyOwner public {
-    require(state == State.Active);
-    state = State.Refunding;
-    RefundsEnabled();
-  }
-
-  function refund(address investor) public {
-    require(state == State.Refunding);
-    uint256 depositedValue = deposited[investor];
-    deposited[investor] = 0;
-    investor.transfer(depositedValue);
-    Refunded(investor, depositedValue);
-  }
-}
 
 
 /**
@@ -353,64 +377,71 @@ contract RefundableCrowdsale is FinalizableCrowdsale {
 }
 
 
-/**
- * @title ERC20Basic
- * @dev Simpler version of ERC20 interface
- * @dev see https://github.com/ethereum/EIPs/issues/179
- */
-contract ERC20Basic {
-  uint256 public totalSupply;
-  function balanceOf(address who) public view returns (uint256);
-  function transfer(address to, uint256 value) public returns (bool);
-  event Transfer(address indexed from, address indexed to, uint256 value);
-}
+
+
 
 
 /**
- * @title ERC20 interface
+ * @title RefundVault
+ * @dev This contract is used for storing funds while a crowdsale
+ * is in progress. Supports refunding the money if crowdsale fails,
+ * and forwarding it if crowdsale is successful.
  */
-contract ERC20 is ERC20Basic {
-  function allowance(address owner, address spender) public view returns (uint256);
-  function transferFrom(address from, address to, uint256 value) public returns (bool);
-  function approve(address spender, uint256 value) public returns (bool);
-  event Approval(address indexed owner, address indexed spender, uint256 value);
-}
-
-/**
- * @title Basic token
- * @dev Basic version of StandardToken, with no allowances.
- */
-contract BasicToken is ERC20Basic {
+contract RefundVault is Ownable {
   using SafeMath for uint256;
 
-  mapping(address => uint256) balances;
+  enum State { Active, Refunding, Closed }
 
-  /**
-  * @dev transfer token for a specified address
-  * @param _to The address to transfer to.
-  * @param _value The amount to be transferred.
-  */
-  function transfer(address _to, uint256 _value) public returns (bool) {
-    require(_to != address(0));
-    require(_value <= balances[msg.sender]);
+  mapping (address => uint256) public deposited;
+  address public wallet;
+  State public state;
 
-    // SafeMath.sub will throw if there is not enough balance.
-    balances[msg.sender] = balances[msg.sender].sub(_value);
-    balances[_to] = balances[_to].add(_value);
-    Transfer(msg.sender, _to, _value);
-    return true;
+  event Closed();
+  event RefundsEnabled();
+  event Refunded(address indexed beneficiary, uint256 weiAmount);
+
+  function RefundVault(address _wallet) public {
+    require(_wallet != address(0));
+    wallet = _wallet;
+    state = State.Active;
   }
 
-  /**
-  * @dev Gets the balance of the specified address.
-  * @param _owner The address to query the the balance of.
-  * @return An uint256 representing the amount owned by the passed address.
-  */
-  function balanceOf(address _owner) public view returns (uint256 balance) {
-    return balances[_owner];
+  function deposit(address investor) onlyOwner public payable {
+    require(state == State.Active);
+    deposited[investor] = deposited[investor].add(msg.value);
   }
 
+  function close() onlyOwner public {
+    require(state == State.Active);
+    state = State.Closed;
+    Closed();
+    wallet.transfer(this.balance);
+  }
+
+  function enableRefunds() onlyOwner public {
+    require(state == State.Active);
+    state = State.Refunding;
+    RefundsEnabled();
+  }
+
+  function refund(address investor) public {
+    require(state == State.Refunding);
+    uint256 depositedValue = deposited[investor];
+    deposited[investor] = 0;
+    investor.transfer(depositedValue);
+    Refunded(investor, depositedValue);
+  }
 }
+
+
+
+
+
+
+
+
+
+
 
 /**
  * @title Standard ERC20 token
@@ -508,6 +539,9 @@ contract StandardToken is ERC20, BasicToken {
 }
 
 
+
+
+
 /**
  * @title Mintable token
  * @dev Simple ERC20 Token example, with mintable token creation
@@ -553,6 +587,19 @@ contract MintableToken is StandardToken, Ownable {
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * @title Burnable Token
  * @dev Token that can be irreversibly burned (destroyed).
@@ -576,6 +623,9 @@ contract BurnableToken is BasicToken {
         Burn(burner, _value);
     }
 }
+
+
+
 
 
 /**
@@ -607,6 +657,7 @@ contract CappedToken is MintableToken {
 }
 
 
+
 contract BRFToken is CappedToken, BurnableToken {
   string public constant name = "BRF Token";
   string public constant symbol = "BRF";
@@ -614,9 +665,15 @@ contract BRFToken is CappedToken, BurnableToken {
   uint256 public constant supplyCap = 1000000000 * (10 ** uint256(decimals));
 
   function BRFToken() public
-    CappedToken(supplyCap) {}
+    CappedToken(supplyCap)
+  {
+    //
+  }
 
 }
+
+
+
 
 
 contract BRFCrowdSaleSettings is Ownable {
@@ -640,8 +697,8 @@ contract BRFCrowdSaleSettings is Ownable {
     uint256[] _icoStartTimes,
     uint256[] _icoEndTimes,
     uint256[] _icoRates,
-    uint256[] _icoCaps
-  ) public {
+    uint256[] _icoCaps) public
+  {
     require((_preIcoCaps[0] > 0) && (_preIcoCaps[1] > 0) && (_preIcoCaps[2] > 0));
     require((_icoCaps[0] > 0) && (_icoCaps[1] > 0) && (_icoCaps[2] > 0));
     require((_preIcoRates[0] > 0) && (_preIcoRates[1] > 0) && (_preIcoRates[2] > 0));
@@ -661,41 +718,38 @@ contract BRFCrowdSaleSettings is Ownable {
     icoCaps = _icoCaps;
   }
 
-
-
   function addWhiteLists(address[] wlAddresses, uint256 rate) public onlyOwner {
     for (uint256 index = 0; index < wlAddresses.length; index++) {
       whiteList[wlAddresses[index]] = rate;
     }
   }
 
-   function getTokenRate(address beneficiary) public view returns (uint256) {
+  function getTokenRate(address beneficiary) public view returns (uint256) {
     uint stage = getStage(now);
-    if((stage < 3) && (whiteList[beneficiary] > 0)) { // is PreICO and WhiteListed, Use WhiteList Rate
+    if ((stage < 3) && (whiteList[beneficiary] > 0)) { // is PreICO and WhiteListed, Use WhiteList Rate
       return whiteList[beneficiary];
     }
     return getRate(stage);
   }
 
   function getRate(uint stage) internal view returns (uint256) {
-    if(stage < 3) {
+    if (stage < 3) {
       return preIcoRates[stage];
     } else {
       return icoRates[(stage - 3)];
     }
   }
 
-
   function getStage(uint currTime) internal view returns (uint) {
-    if(currTime < preIcoEndTimes[0]) {
+    if (currTime < preIcoEndTimes[0]) {
       return 0;
-    } else if((currTime > preIcoEndTimes[0]) && (currTime <= preIcoEndTimes[1])) {
+    } else if ((currTime > preIcoEndTimes[0]) && (currTime <= preIcoEndTimes[1])) {
       return 1;
-    } else if((currTime > preIcoEndTimes[1]) && (currTime <= preIcoEndTimes[2])) {
+    } else if ((currTime > preIcoEndTimes[1]) && (currTime <= preIcoEndTimes[2])) {
       return 2;
-    } else if((currTime > preIcoEndTimes[2]) && (currTime <= icoEndTimes[0])) {
+    } else if ((currTime > preIcoEndTimes[2]) && (currTime <= icoEndTimes[0])) {
       return 3;
-    } else if((currTime > icoEndTimes[1]) && (currTime <= icoEndTimes[2])) {
+    } else if ((currTime > icoEndTimes[1]) && (currTime <= icoEndTimes[2])) {
       return 4;
     } else {
       return 5;
@@ -704,10 +758,12 @@ contract BRFCrowdSaleSettings is Ownable {
 
 }
 
-contract BRFCrowdsale is Crowdsale, CappedCrowdsale, RefundableCrowdsale {
+
+contract BRFCrowdsale is RefundableCrowdsale, CappedCrowdsale {
 
   address public settingContractAddress;
-
+  address[] public investors;
+  uint256 public managementTokenAllocation;
 
   event TokenAllocated(address indexed beneficiary, uint256 tokensAllocated, uint256 amount);
 
@@ -718,7 +774,8 @@ contract BRFCrowdsale is Crowdsale, CappedCrowdsale, RefundableCrowdsale {
     address _wallet,
     uint256 _cap,
     uint256 _goal,
-    address _settingContractAddress
+    address _settingContractAddress,
+    uint256 _managementTokenAllocation
     ) public
     Crowdsale(_startTime, _endTime, _defaultRate, _wallet)
     CappedCrowdsale(_cap)
@@ -726,37 +783,59 @@ contract BRFCrowdsale is Crowdsale, CappedCrowdsale, RefundableCrowdsale {
   {
     require(_goal <= _cap);
     settingContractAddress = _settingContractAddress;
+    managementTokenAllocation = _managementTokenAllocation;
+    allocateTokens(owner, _managementTokenAllocation, 0);
   }
-
 
   // fallback function can be used to buy tokens
   function () external payable {
     buyTokens(msg.sender);
   }
 
-  function createTokenContract() internal returns (MintableToken) {
-    return new BRFToken();
-  }
-
   // For Allocating PreSold and Reserved Tokens
   function allocateTokens(address beneficiary, uint tokensToAllocate, uint weiPrice) public onlyOwner {
 
     BRFToken brfToken = BRFToken(token);
-
     uint tokensWithDecimals = uint(tokensToAllocate * (10 ** uint256(brfToken.decimals())));
-
     uint weiAmount = weiPrice * tokensWithDecimals;
-
     weiRaised = weiRaised.add(weiAmount);
-
     token.mint(beneficiary, tokensWithDecimals);
-
     TokenAllocated(beneficiary, tokensWithDecimals, weiAmount);
   }
-
 
   function buyTokens(address beneficiary) public payable {
     // update token rate
     BRFCrowdSaleSettings settingsContract = BRFCrowdSaleSettings(settingContractAddress);
     rate = settingsContract.getTokenRate(beneficiary);
+    if (!alreadyDeposited(beneficiary)) {
+      investors.push(beneficiary);
+    }
     super.buyTokens(beneficiary);
+  }
+
+  function refundInvestors() public onlyOwner {
+    require(isFinalized);
+    require(!goalReached());
+    for (uint256 i = 0; i < investors.length; i++) {
+      vault.refund(investors[i]);
+    }
+  }
+
+  function getInvestorCount() public view returns(uint256) {
+    return investors.length;
+  }
+
+  function createTokenContract() internal returns (MintableToken) {
+    return new BRFToken();
+  }
+
+  function alreadyDeposited(address depositor) internal view returns(bool) {
+    for (uint256 i = 0; i < investors.length; i++) {
+      if (investors[i] == depositor) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+}
