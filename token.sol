@@ -1,6 +1,47 @@
 pragma solidity ^0.4.18;
 
+// File: zeppelin-solidity/contracts/math/SafeMath.sol
 
+/**
+ * @title SafeMath
+ * @dev Math operations with safety checks that throw on error
+ */
+library SafeMath {
+  function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+    if (a == 0) {
+      return 0;
+    }
+    uint256 c = a * b;
+    assert(c / a == b);
+    return c;
+  }
+
+  function div(uint256 a, uint256 b) internal pure returns (uint256) {
+    // assert(b > 0); // Solidity automatically throws when dividing by 0
+    uint256 c = a / b;
+    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+    return c;
+  }
+
+  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+    assert(b <= a);
+    return a - b;
+  }
+
+  function add(uint256 a, uint256 b) internal pure returns (uint256) {
+    uint256 c = a + b;
+    assert(c >= a);
+    return c;
+  }
+}
+
+// File: zeppelin-solidity/contracts/token/ERC20Basic.sol
+
+/**
+ * @title ERC20Basic
+ * @dev Simpler version of ERC20 interface
+ * @dev see https://github.com/ethereum/EIPs/issues/179
+ */
 contract ERC20Basic {
   uint256 public totalSupply;
   function balanceOf(address who) public view returns (uint256);
@@ -8,14 +49,7 @@ contract ERC20Basic {
   event Transfer(address indexed from, address indexed to, uint256 value);
 }
 
-contract ERC20 is ERC20Basic {
-  function allowance(address owner, address spender) public view returns (uint256);
-  function transferFrom(address from, address to, uint256 value) public returns (bool);
-  function approve(address spender, uint256 value) public returns (bool);
-  event Approval(address indexed owner, address indexed spender, uint256 value);
-}
-
-
+// File: zeppelin-solidity/contracts/token/BasicToken.sol
 
 /**
  * @title Basic token
@@ -53,395 +87,20 @@ contract BasicToken is ERC20Basic {
 
 }
 
-
-
-/**
- * @title Ownable
- * @dev The Ownable contract has an owner address, and provides basic authorization control
- * functions, this simplifies the implementation of "user permissions".
- */
-contract Ownable {
-  address public owner;
-
-
-  event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-
-
-  /**
-   * @dev The Ownable constructor sets the original `owner` of the contract to the sender
-   * account.
-   */
-  function Ownable() public {
-    owner = msg.sender;
-  }
-
-
-  /**
-   * @dev Throws if called by any account other than the owner.
-   */
-  modifier onlyOwner() {
-    require(msg.sender == owner);
-    _;
-  }
-
-
-  /**
-   * @dev Allows the current owner to transfer control of the contract to a newOwner.
-   * @param newOwner The address to transfer ownership to.
-   */
-  function transferOwnership(address newOwner) public onlyOwner {
-    require(newOwner != address(0));
-    OwnershipTransferred(owner, newOwner);
-    owner = newOwner;
-  }
-
-}
-
-
-
-
-
-
-
+// File: zeppelin-solidity/contracts/token/ERC20.sol
 
 /**
- * @title SafeMath
- * @dev Math operations with safety checks that throw on error
+ * @title ERC20 interface
+ * @dev see https://github.com/ethereum/EIPs/issues/20
  */
-library SafeMath {
-  function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-    if (a == 0) {
-      return 0;
-    }
-    uint256 c = a * b;
-    assert(c / a == b);
-    return c;
-  }
-
-  function div(uint256 a, uint256 b) internal pure returns (uint256) {
-    // assert(b > 0); // Solidity automatically throws when dividing by 0
-    uint256 c = a / b;
-    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-    return c;
-  }
-
-  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-    assert(b <= a);
-    return a - b;
-  }
-
-  function add(uint256 a, uint256 b) internal pure returns (uint256) {
-    uint256 c = a + b;
-    assert(c >= a);
-    return c;
-  }
+contract ERC20 is ERC20Basic {
+  function allowance(address owner, address spender) public view returns (uint256);
+  function transferFrom(address from, address to, uint256 value) public returns (bool);
+  function approve(address spender, uint256 value) public returns (bool);
+  event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
-
-/**
- * @title Crowdsale
- * @dev Crowdsale is a base contract for managing a token crowdsale.
- * Crowdsales have a start and end timestamps, where investors can make
- * token purchases and the crowdsale will assign them tokens based
- * on a token per ETH rate. Funds collected are forwarded to a wallet
- * as they arrive.
- */
-contract Crowdsale {
-  using SafeMath for uint256;
-
-  // The token being sold
-  MintableToken public token;
-
-  // start and end timestamps where investments are allowed (both inclusive)
-  uint256 public startTime;
-  uint256 public endTime;
-
-  // address where funds are collected
-  address public wallet;
-
-  // how many token units a buyer gets per wei
-  uint256 public rate;
-
-  // amount of raised money in wei
-  uint256 public weiRaised;
-
-  /**
-   * event for token purchase logging
-   * @param purchaser who paid for the tokens
-   * @param beneficiary who got the tokens
-   * @param value weis paid for purchase
-   * @param amount amount of tokens purchased
-   */
-  event TokenPurchase(address indexed purchaser, address indexed beneficiary, uint256 value, uint256 amount);
-
-
-  function Crowdsale(uint256 _startTime, uint256 _endTime, uint256 _rate, address _wallet) public {
-    require(_startTime >= now);
-    require(_endTime >= _startTime);
-    require(_rate > 0);
-    require(_wallet != address(0));
-
-    token = createTokenContract();
-    startTime = _startTime;
-    endTime = _endTime;
-    rate = _rate;
-    wallet = _wallet;
-  }
-
-  // creates the token to be sold.
-  // override this method to have crowdsale of a specific mintable token.
-  function createTokenContract() internal returns (MintableToken) {
-    return new MintableToken();
-  }
-
-
-  // fallback function can be used to buy tokens
-  function () external payable {
-    buyTokens(msg.sender);
-  }
-
-  // low level token purchase function
-  function buyTokens(address beneficiary) public payable {
-    require(beneficiary != address(0));
-    // require(validPurchase());
-
-    uint256 weiAmount = msg.value;
-
-    // calculate token amount to be created
-    uint256 tokens = weiAmount.mul(rate);
-
-    // update state
-    weiRaised = weiRaised.add(weiAmount);
-
-    token.mint(beneficiary, tokens);
-    TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
-
-    forwardFunds();
-  }
-
-  // send ether to the fund collection wallet
-  // override to create custom fund forwarding mechanisms
-  function forwardFunds() internal {
-    wallet.transfer(msg.value);
-  }
-
-  // @return true if the transaction can buy tokens
-  function validPurchase() internal view returns (bool) {
-    bool withinPeriod = now >= startTime && now <= endTime;
-    bool nonZeroPurchase = msg.value != 0;
-    return withinPeriod && nonZeroPurchase;
-  }
-
-  // @return true if crowdsale event has ended
-  function hasEnded() public view returns (bool) {
-    return now > endTime;
-  }
-
-
-}
-
-
-
-
-
-
-/**
- * @title CappedCrowdsale
- * @dev Extension of Crowdsale with a max amount of funds raised
- */
-contract CappedCrowdsale is Crowdsale {
-  using SafeMath for uint256;
-
-  uint256 public cap;
-
-  function CappedCrowdsale(uint256 _cap) public {
-    require(_cap > 0);
-    cap = _cap;
-  }
-
-  // overriding Crowdsale#validPurchase to add extra cap logic
-  // @return true if investors can buy at the moment
-  function validPurchase() internal view returns (bool) {
-    bool withinCap = weiRaised.add(msg.value) <= cap;
-    return super.validPurchase() && withinCap;
-  }
-
-  // overriding Crowdsale#hasEnded to add cap logic
-  // @return true if crowdsale event has ended
-  function hasEnded() public view returns (bool) {
-    bool capReached = weiRaised >= cap;
-    return super.hasEnded() || capReached;
-  }
-
-}
-
-
-
-
-
-
-
-
-
-
-
-/**
- * @title FinalizableCrowdsale
- * @dev Extension of Crowdsale where an owner can do extra work
- * after finishing.
- */
-contract FinalizableCrowdsale is Crowdsale, Ownable {
-  using SafeMath for uint256;
-
-  bool public isFinalized = false;
-
-  event Finalized();
-
-  /**
-   * @dev Must be called after crowdsale ends, to do some extra finalization
-   * work. Calls the contract's finalization function.
-   */
-  function finalize() onlyOwner public {
-    require(!isFinalized);
-    require(hasEnded());
-
-    finalization();
-    Finalized();
-
-    isFinalized = true;
-  }
-
-  /**
-   * @dev Can be overridden to add finalization logic. The overriding function
-   * should call super.finalization() to ensure the chain of finalization is
-   * executed entirely.
-   */
-  function finalization() internal {
-  }
-}
-
-
-
-
-/**
- * @title RefundableCrowdsale
- * @dev Extension of Crowdsale contract that adds a funding goal, and
- * the possibility of users getting a refund if goal is not met.
- * Uses a RefundVault as the crowdsale's vault.
- */
-contract RefundableCrowdsale is FinalizableCrowdsale {
-  using SafeMath for uint256;
-
-  // minimum amount of funds to be raised in weis
-  uint256 public goal;
-
-  // refund vault used to hold funds while crowdsale is running
-  RefundVault public vault;
-
-  function RefundableCrowdsale(uint256 _goal) public {
-    require(_goal > 0);
-    vault = new RefundVault(wallet);
-    goal = _goal;
-  }
-
-  // We're overriding the fund forwarding from Crowdsale.
-  // In addition to sending the funds, we want to call
-  // the RefundVault deposit function
-  function forwardFunds() internal {
-    vault.deposit.value(msg.value)(msg.sender);
-  }
-
-  // if crowdsale is unsuccessful, investors can claim refunds here
-  function claimRefund() public {
-    require(isFinalized);
-    require(!goalReached());
-
-    vault.refund(msg.sender);
-  }
-
-  // vault finalization task, called when owner calls finalize()
-  function finalization() internal {
-    if (goalReached()) {
-      vault.close();
-    } else {
-      vault.enableRefunds();
-    }
-
-    super.finalization();
-  }
-
-  function goalReached() public view returns (bool) {
-    return weiRaised >= goal;
-  }
-
-}
-
-
-
-
-
-
-/**
- * @title RefundVault
- * @dev This contract is used for storing funds while a crowdsale
- * is in progress. Supports refunding the money if crowdsale fails,
- * and forwarding it if crowdsale is successful.
- */
-contract RefundVault is Ownable {
-  using SafeMath for uint256;
-
-  enum State { Active, Refunding, Closed }
-
-  mapping (address => uint256) public deposited;
-  address public wallet;
-  State public state;
-
-  event Closed();
-  event RefundsEnabled();
-  event Refunded(address indexed beneficiary, uint256 weiAmount);
-
-  function RefundVault(address _wallet) public {
-    require(_wallet != address(0));
-    wallet = _wallet;
-    state = State.Active;
-  }
-
-  function deposit(address investor) onlyOwner public payable {
-    require(state == State.Active);
-    deposited[investor] = deposited[investor].add(msg.value);
-  }
-
-  function close() onlyOwner public {
-    require(state == State.Active);
-    state = State.Closed;
-    Closed();
-    wallet.transfer(this.balance);
-  }
-
-  function enableRefunds() onlyOwner public {
-    require(state == State.Active);
-    state = State.Refunding;
-    RefundsEnabled();
-  }
-
-  function refund(address investor) public {
-    require(state == State.Refunding);
-    uint256 depositedValue = deposited[investor];
-    deposited[investor] = 0;
-    investor.transfer(depositedValue);
-    Refunded(investor, depositedValue);
-  }
-}
-
-
-
-
-
-
-
-
-
-
+// File: zeppelin-solidity/contracts/token/StandardToken.sol
 
 /**
  * @title Standard ERC20 token
@@ -538,67 +197,400 @@ contract StandardToken is ERC20, BasicToken {
 
 }
 
+// File: contracts/base/crowdsale/Crowdsale.sol
+
+/**
+ * @title Crowdsale
+ * @dev Crowdsale is a base contract for managing a token crowdsale.
+ * Crowdsales have a start and end timestamps, where investors can make
+ * token purchases and the crowdsale will assign them tokens based
+ * on a token per ETH rate. Funds collected are forwarded to a wallet
+ * as they arrive.
+ */
+contract Crowdsale {
+  using SafeMath for uint256;
+
+  // The token being sold
+  StandardToken public token;
+
+  // start and end timestamps where investments are allowed (both inclusive)
+  uint256 public startTime;
+  uint256 public endTime;
+
+  // address where funds are collected
+  address public wallet;
+
+  // how many token units a buyer gets per wei
+  uint256 public rate;
+
+  // amount of raised money in wei
+  uint256 public weiRaised;
+
+  /**
+   * event for token purchase logging
+   * @param purchaser who paid for the tokens
+   * @param beneficiary who got the tokens
+   * @param value weis paid for purchase
+   * @param amount amount of tokens purchased
+   */
+  event TokenPurchase(address indexed purchaser, address indexed beneficiary, uint256 value, uint256 amount);
+
+
+  function Crowdsale(uint256 _startTime, uint256 _endTime, uint256 _rate, address _wallet, StandardToken _token) public {
+    require(_startTime >= now);
+    require(_endTime >= _startTime);
+    require(_rate > 0);
+    require(_wallet != address(0));
+    require(_token != address(0));
+
+    token = _token;
+    startTime = _startTime;
+    endTime = _endTime;
+    rate = _rate;
+    wallet = _wallet;
+  }
+
+
+  // fallback function can be used to buy tokens
+  function () external payable {
+    buyTokens(msg.sender);
+  }
+
+  // low level token purchase function
+  function buyTokens(address beneficiary) public payable {
+    require(beneficiary != address(0));
+    require(validPurchase());
+
+    uint256 weiAmount = msg.value;
+
+    // calculate token amount to be created
+    uint256 tokens = weiAmount.mul(rate);
+
+    // update state
+    weiRaised = weiRaised.add(weiAmount);
+
+    token.transfer(beneficiary, tokens);
+    TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
+
+    forwardFunds();
+  }
+
+  // send ether to the fund collection wallet
+  // override to create custom fund forwarding mechanisms
+  function forwardFunds() internal {
+    wallet.transfer(msg.value);
+  }
+
+  // @return true if the transaction can buy tokens
+  function validPurchase() internal view returns (bool) {
+    bool withinPeriod = now >= startTime && now <= endTime;
+    bool nonZeroPurchase = msg.value != 0;
+    return withinPeriod && nonZeroPurchase;
+  }
+
+  // @return true if crowdsale event has ended
+  function hasEnded() public view returns (bool) {
+    return now > endTime;
+  }
+
+
+}
+
+// File: zeppelin-solidity/contracts/ownership/Ownable.sol
+
+/**
+ * @title Ownable
+ * @dev The Ownable contract has an owner address, and provides basic authorization control
+ * functions, this simplifies the implementation of "user permissions".
+ */
+contract Ownable {
+  address public owner;
+
+
+  event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+
+  /**
+   * @dev The Ownable constructor sets the original `owner` of the contract to the sender
+   * account.
+   */
+  function Ownable() public {
+    owner = msg.sender;
+  }
+
+
+  /**
+   * @dev Throws if called by any account other than the owner.
+   */
+  modifier onlyOwner() {
+    require(msg.sender == owner);
+    _;
+  }
+
+
+  /**
+   * @dev Allows the current owner to transfer control of the contract to a newOwner.
+   * @param newOwner The address to transfer ownership to.
+   */
+  function transferOwnership(address newOwner) public onlyOwner {
+    require(newOwner != address(0));
+    OwnershipTransferred(owner, newOwner);
+    owner = newOwner;
+  }
+
+}
+
+// File: contracts/base/crowdsale/FinalizableCrowdsale.sol
+
+/**
+ * @title FinalizableCrowdsale
+ * @dev Extension of Crowdsale where an owner can do extra work
+ * after finishing.
+ */
+
+
+contract FinalizableCrowdsale is Crowdsale, Ownable {
+  using SafeMath for uint256;
+
+  bool public isFinalized = false;
+
+  event Finalized();
+
+  /**
+   * @dev Must be called after crowdsale ends, to do some extra finalization
+   * work. Calls the contract's finalization function.
+   */
+  function finalize() onlyOwner public {
+    require(!isFinalized);
+    require(hasEnded());
+
+    finalization();
+    Finalized();
+
+    isFinalized = true;
+  }
+
+  /**
+   * @dev Can be overridden to add finalization logic. The overriding function
+   * should call super.finalization() to ensure the chain of finalization is
+   * executed entirely.
+   */
+  function finalization() internal {
+  }
+}
+
+// File: contracts/base/crowdsale/RefundVault.sol
+
+/**
+ * @title RefundVault
+ * @dev This contract is used for storing funds while a crowdsale
+ * is in progress. Supports refunding the money if crowdsale fails,
+ * and forwarding it if crowdsale is successful.
+ */
+
+
+contract RefundVault is Ownable {
+  using SafeMath for uint256;
+
+  enum State { Active, Refunding, Closed }
+
+  mapping (address => uint256) public deposited;
+  address public wallet;
+  State public state;
+
+  event Closed();
+  event RefundsEnabled();
+  event Refunded(address indexed beneficiary, uint256 weiAmount);
+
+  function RefundVault(address _wallet) public {
+    require(_wallet != address(0));
+    wallet = _wallet;
+    state = State.Active;
+  }
+
+  function deposit(address investor) onlyOwner public payable {
+    require(state == State.Active);
+    deposited[investor] = deposited[investor].add(msg.value);
+  }
+
+  function close() onlyOwner public {
+    require(state == State.Active);
+    state = State.Closed;
+    Closed();
+    wallet.transfer(this.balance);
+  }
+
+  function enableRefunds() onlyOwner public {
+    require(state == State.Active);
+    state = State.Refunding;
+    RefundsEnabled();
+  }
+
+  function refund(address investor) public {
+    require(state == State.Refunding);
+    uint256 depositedValue = deposited[investor];
+    deposited[investor] = 0;
+    investor.transfer(depositedValue);
+    Refunded(investor, depositedValue);
+  }
+}
+
+// File: contracts/base/crowdsale/RefundableCrowdsale.sol
+
+/**
+ * @title RefundableCrowdsale
+ * @dev Extension of Crowdsale contract that adds a funding goal, and
+ * the possibility of users getting a refund if goal is not met.
+ * Uses a RefundVault as the crowdsale's vault.
+ */
+
+
+contract RefundableCrowdsale is FinalizableCrowdsale {
+  using SafeMath for uint256;
+
+  // minimum amount of funds to be raised in weis
+  uint256 public goal;
+
+  // refund vault used to hold funds while crowdsale is running
+  RefundVault public vault;
+
+  function RefundableCrowdsale(uint256 _goal) public {
+    require(_goal > 0);
+    vault = new RefundVault(wallet);
+    goal = _goal;
+  }
+
+  // We're overriding the fund forwarding from Crowdsale.
+  // In addition to sending the funds, we want to call
+  // the RefundVault deposit function
+  function forwardFunds() internal {
+    vault.deposit.value(msg.value)(msg.sender);
+  }
+
+  // if crowdsale is unsuccessful, investors can claim refunds here
+  function claimRefund() public {
+    require(isFinalized);
+    require(!goalReached());
+
+    vault.refund(msg.sender);
+  }
+
+  // vault finalization task, called when owner calls finalize()
+  function finalization() internal {
+    if (goalReached()) {
+      vault.close();
+    } else {
+      vault.enableRefunds();
+    }
+
+    super.finalization();
+  }
+
+  function goalReached() public view returns (bool) {
+    return weiRaised >= goal;
+  }
+
+}
+
+// File: contracts/base/tokens/ReleasableToken.sol
+
+/**
+ * This smart contract code is Copyright 2017 TokenMarket Ltd. For more information see https://tokenmarket.net
+ *
+ * Licensed under the Apache License, version 2.0: https://github.com/TokenMarketNet/ico/blob/master/LICENSE.txt
+ */
+
+pragma solidity ^0.4.8;
+
 
 
 
 
 /**
- * @title Mintable token
- * @dev Simple ERC20 Token example, with mintable token creation
- * @dev Issue: * https://github.com/OpenZeppelin/zeppelin-solidity/issues/120
- * Based on code by TokenMarketNet: https://github.com/TokenMarketNet/ico/blob/master/contracts/MintableToken.sol
+ * Define interface for releasing the token transfer after a successful crowdsale.
  */
+contract ReleasableToken is ERC20, Ownable {
 
-contract MintableToken is StandardToken, Ownable {
-  event Mint(address indexed to, uint256 amount);
-  event MintFinished();
+  /* The finalizer contract that allows unlift the transfer limits on this token */
+  address public releaseAgent;
 
-  bool public mintingFinished = false;
+  /** A crowdsale contract can release us to the wild if ICO success. If false we are are in transfer lock up period.*/
+  bool public released = false;
 
+  /** Map of agents that are allowed to transfer tokens regardless of the lock down period. These are crowdsale contracts and possible the team multisig itself. */
+  mapping (address => bool) public transferAgents;
 
-  modifier canMint() {
-    require(!mintingFinished);
+  /**
+   * Limit token transfer until the crowdsale is over.
+   *
+   */
+  modifier canTransfer(address _sender) {
+
+    if (!released) {
+      if (!transferAgents[_sender]) {
+        revert();
+      }
+    }
+
     _;
   }
 
   /**
-   * @dev Function to mint tokens
-   * @param _to The address that will receive the minted tokens.
-   * @param _amount The amount of tokens to mint.
-   * @return A boolean that indicates if the operation was successful.
+   * Set the contract that can call release and make the token transferable.
+   *
+   * Design choice. Allow reset the release agent to fix fat finger mistakes.
    */
-  function mint(address _to, uint256 _amount) onlyOwner canMint public returns (bool) {
-    totalSupply = totalSupply.add(_amount);
-    balances[_to] = balances[_to].add(_amount);
-    Mint(_to, _amount);
-    Transfer(address(0), _to, _amount);
-    return true;
+  function setReleaseAgent(address addr) onlyOwner inReleaseState(false) public {
+
+    // We don't do interface check here as we might want to a normal wallet address to act as a release agent
+    releaseAgent = addr;
   }
 
   /**
-   * @dev Function to stop minting new tokens.
-   * @return True if the operation was successful.
+   * Owner can allow a particular address (a crowdsale contract) to transfer tokens despite the lock up period.
    */
-  function finishMinting() onlyOwner canMint public returns (bool) {
-    mintingFinished = true;
-    MintFinished();
-    return true;
+  function setTransferAgent(address addr, bool state) onlyOwner inReleaseState(false) public {
+    transferAgents[addr] = state;
   }
+
+  /**
+   * One way function to release the tokens to the wild.
+   *
+   * Can be called only from the release agent that is the final ICO contract. It is only called if the crowdsale has been success (first milestone reached).
+   */
+  function releaseTokenTransfer() public onlyReleaseAgent {
+    released = true;
+  }
+
+  /** The function can be called only before or after the tokens have been released */
+  modifier inReleaseState(bool releaseState) {
+    if (releaseState != released) {
+      revert();
+    }
+    _;
+  }
+
+  /** The function can be called only by a whitelisted release agent. */
+  modifier onlyReleaseAgent() {
+    if (msg.sender != releaseAgent) {
+      revert();
+    }
+    _;
+  }
+
+  function transfer(address _to, uint _value) public canTransfer(msg.sender) returns (bool success) {
+    // Call StandardToken.transfer()
+    return super.transfer(_to, _value);
+  }
+
+  function transferFrom(address _from, address _to, uint _value) public canTransfer(_from) returns (bool success) {
+    // Call StandardToken.transferForm()
+    return super.transferFrom(_from, _to, _value);
+  }
+
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+// File: zeppelin-solidity/contracts/token/BurnableToken.sol
 
 /**
  * @title Burnable Token
@@ -624,218 +616,186 @@ contract BurnableToken is BasicToken {
     }
 }
 
+// File: contracts/BRFToken/BRFToken.sol
 
-
-
-
-/**
- * @title Capped token
- * @dev Mintable token with a token cap.
- */
-
-contract CappedToken is MintableToken {
-
-  uint256 public cap;
-
-  function CappedToken(uint256 _cap) public {
-    require(_cap > 0);
-    cap = _cap;
-  }
-
-  /**
-   * @dev Function to mint tokens
-   * @param _to The address that will receive the minted tokens.
-   * @param _amount The amount of tokens to mint.
-   * @return A boolean that indicates if the operation was successful.
-   */
-  function mint(address _to, uint256 _amount) onlyOwner canMint public returns (bool) {
-    require(totalSupply.add(_amount) <= cap);
-
-    return super.mint(_to, _amount);
-  }
-
-}
-
-
-
-contract BRFToken is CappedToken, BurnableToken {
+contract BRFToken is StandardToken, ReleasableToken, BurnableToken {
   string public constant name = "BRF Token";
   string public constant symbol = "BRF";
   uint8 public constant decimals = 18;
-  uint256 public constant supplyCap = 1000000000 * (10 ** uint256(decimals));
 
-  function BRFToken() public
-    CappedToken(supplyCap)
-  {
-    //
+  function BRFToken() public {
+    totalSupply = 1000000000 * (10 ** uint256(decimals));
+    balances[msg.sender] = totalSupply;
+    setReleaseAgent(msg.sender);
+    setTransferAgent(msg.sender, true);
   }
 
 }
 
+// File: contracts/BRFToken/BRFCrowdsale.sol
 
+contract BRFCrowdsale is RefundableCrowdsale {
 
-
-
-contract BRFCrowdSaleSettings is Ownable {
-
-  uint256[] public preIcoStartTimes;
-  uint256[] public preIcoEndTimes;
-  uint256[] public preIcoRates;
-  uint256[] public preIcoCaps;
-  uint256[] public icoStartTimes;
-  uint256[] public icoEndTimes;
-  uint256[] public icoRates;
-  uint256[] public icoCaps;
-
-  mapping(address => uint256) public whiteList;
-
-  function BRFCrowdSaleSettings (
-    uint256[] _preIcoStartTimes,
-    uint256[] _preIcoEndTimes,
-    uint256[] _preIcoRates,
-    uint256[] _preIcoCaps,
-    uint256[] _icoStartTimes,
-    uint256[] _icoEndTimes,
-    uint256[] _icoRates,
-    uint256[] _icoCaps) public
-  {
-    require((_preIcoCaps[0] > 0) && (_preIcoCaps[1] > 0) && (_preIcoCaps[2] > 0));
-    require((_icoCaps[0] > 0) && (_icoCaps[1] > 0) && (_icoCaps[2] > 0));
-    require((_preIcoRates[0] > 0) && (_preIcoRates[1] > 0) && (_preIcoRates[2] > 0));
-    require((_icoRates[0] > 0) && (_icoRates[1] > 0) && (_icoRates[2] > 0));
-    require((_preIcoEndTimes[0] > _preIcoStartTimes[0]) && (_preIcoEndTimes[1] > _preIcoStartTimes[1]) && (_preIcoEndTimes[2] > _preIcoStartTimes[2]));
-    require((_icoEndTimes[0] > _icoStartTimes[0]) && (_icoEndTimes[1] > _icoStartTimes[1]) && (_icoEndTimes[2] > _icoStartTimes[2]));
-    require((_preIcoStartTimes[1] >= _preIcoEndTimes[0]) && (_preIcoStartTimes[2] >= _preIcoEndTimes[1]));
-    require((_icoStartTimes[1] >= _icoEndTimes[0]) && (_icoStartTimes[2] >= _icoEndTimes[1]));
-
-    preIcoStartTimes = _preIcoStartTimes;
-    preIcoEndTimes = _preIcoEndTimes;
-    preIcoRates = _preIcoRates;
-    preIcoCaps = _preIcoCaps;
-    icoStartTimes = _icoStartTimes;
-    icoEndTimes = _icoEndTimes;
-    icoRates = _icoRates;
-    icoCaps = _icoCaps;
-  }
-
-  function addWhiteLists(address[] wlAddresses, uint256 rate) public onlyOwner {
-    for (uint256 index = 0; index < wlAddresses.length; index++) {
-      whiteList[wlAddresses[index]] = rate;
-    }
-  }
-
-  function getTokenRate(address beneficiary) public view returns (uint256) {
-    uint stage = getStage(now);
-    if ((stage < 3) && (whiteList[beneficiary] > 0)) { // is PreICO and WhiteListed, Use WhiteList Rate
-      return whiteList[beneficiary];
-    }
-    return getRate(stage);
-  }
-
-  function getRate(uint stage) internal view returns (uint256) {
-    if (stage < 3) {
-      return preIcoRates[stage];
-    } else {
-      return icoRates[(stage - 3)];
-    }
-  }
-
-  function getStage(uint currTime) internal view returns (uint) {
-    if (currTime < preIcoEndTimes[0]) {
-      return 0;
-    } else if ((currTime > preIcoEndTimes[0]) && (currTime <= preIcoEndTimes[1])) {
-      return 1;
-    } else if ((currTime > preIcoEndTimes[1]) && (currTime <= preIcoEndTimes[2])) {
-      return 2;
-    } else if ((currTime > preIcoEndTimes[2]) && (currTime <= icoEndTimes[0])) {
-      return 3;
-    } else if ((currTime > icoEndTimes[1]) && (currTime <= icoEndTimes[2])) {
-      return 4;
-    } else {
-      return 5;
-    }
-  }
-
-}
-
-
-contract BRFCrowdsale is RefundableCrowdsale, CappedCrowdsale {
-
-  address public settingContractAddress;
-  address[] public investors;
+  uint256[3] public icoStartTimes;
+  uint256[3] public icoEndTimes;
+  uint256[3] public icoRates;
+  uint256[3] public icoCaps;
   uint256 public managementTokenAllocation;
+  address public managementWalletAddress;
+  uint256 public bountryTokenAllocation;
+  address public bountryManagementWalletAddress;
+  bool public contractInitialized = false;
+  address[] public directInvestors;
+  mapping(address => uint256) public indirectInvestors;
+  uint256 public constant MINIMUM_PURCHASE = 100;
+  mapping(uint256 => uint256) public totalTokensByStage;
 
   event TokenAllocated(address indexed beneficiary, uint256 tokensAllocated, uint256 amount);
 
   function BRFCrowdsale(
-    uint256 _startTime,
-    uint256 _endTime,
-    uint256 _defaultRate,
+    uint256[3] _icoStartTimes,
+    uint256[3] _icoEndTimes,
+    uint256[3] _icoRates,
+    uint256[3] _icoCaps,
     address _wallet,
-    uint256 _cap,
     uint256 _goal,
-    address _settingContractAddress,
-    uint256 _managementTokenAllocation
+    uint256 _managementTokenAllocation,
+    address _managementWalletAddress,
+    uint256 _bountryTokenAllocation,
+    address _bountryManagementWalletAddress
     ) public
-    Crowdsale(_startTime, _endTime, _defaultRate, _wallet)
-    CappedCrowdsale(_cap)
+    Crowdsale(_icoStartTimes[0], _icoEndTimes[2], _icoRates[0], _wallet, new BRFToken())
     RefundableCrowdsale(_goal)
   {
-    require(_goal <= _cap);
-    settingContractAddress = _settingContractAddress;
+    require((_icoCaps[0] > 0) && (_icoCaps[1] > 0) && (_icoCaps[2] > 0));
+    require((_icoRates[0] > 0) && (_icoRates[1] > 0) && (_icoRates[2] > 0));
+    require((_icoEndTimes[0] > _icoStartTimes[0]) && (_icoEndTimes[1] > _icoStartTimes[1]) && (_icoEndTimes[2] > _icoStartTimes[2]));
+    require((_icoStartTimes[1] >= _icoEndTimes[0]) && (_icoStartTimes[2] >= _icoEndTimes[1]));
+    require(_managementWalletAddress != owner && _wallet != _managementWalletAddress);
+    require(_bountryManagementWalletAddress != owner && _wallet != _bountryManagementWalletAddress);
+    icoStartTimes = _icoStartTimes;
+    icoEndTimes = _icoEndTimes;
+    icoRates = _icoRates;
+    icoCaps = _icoCaps;
     managementTokenAllocation = _managementTokenAllocation;
-    allocateTokens(owner, _managementTokenAllocation, 0);
+    managementWalletAddress = _managementWalletAddress;
+    bountryTokenAllocation = _bountryTokenAllocation;
+    bountryManagementWalletAddress = _bountryManagementWalletAddress;
   }
 
   // fallback function can be used to buy tokens
   function () external payable {
+    require(contractInitialized);
     buyTokens(msg.sender);
   }
 
-  // For Allocating PreSold and Reserved Tokens
-  function allocateTokens(address beneficiary, uint tokensToAllocate, uint weiPrice) public onlyOwner {
-
+  function initializeContract() public onlyOwner {
+    require(!contractInitialized);
+    allocateTokens(managementWalletAddress, managementTokenAllocation, 0, 0);
+    allocateTokens(bountryManagementWalletAddress, bountryTokenAllocation, 0, 0);
     BRFToken brfToken = BRFToken(token);
-    uint tokensWithDecimals = uint(tokensToAllocate * (10 ** uint256(brfToken.decimals())));
-    uint weiAmount = weiPrice * tokensWithDecimals;
+    brfToken.setTransferAgent(managementWalletAddress, true);
+    brfToken.setTransferAgent(bountryManagementWalletAddress, true);
+    contractInitialized = true;
+  }
+
+  // For Allocating PreSold and Reserved Tokens
+  function allocateTokens(address beneficiary, uint256 tokensToAllocate, uint256 stage, uint256 weiPrice) public onlyOwner {
+    require(stage <= 5);
+    uint256 tokensWithDecimals = toBRFWEI(tokensToAllocate);
+    uint256 weiAmount = weiPrice * tokensWithDecimals;
     weiRaised = weiRaised.add(weiAmount);
-    token.mint(beneficiary, tokensWithDecimals);
+    if (weiAmount > 0) {
+      totalTokensByStage[stage] = totalTokensByStage[stage].add(tokensWithDecimals);
+      indirectInvestors[beneficiary] = indirectInvestors[beneficiary].add(tokensWithDecimals);
+    }
+    token.transfer(beneficiary, tokensWithDecimals);
     TokenAllocated(beneficiary, tokensWithDecimals, weiAmount);
   }
 
   function buyTokens(address beneficiary) public payable {
+    require(contractInitialized);
     // update token rate
-    BRFCrowdSaleSettings settingsContract = BRFCrowdSaleSettings(settingContractAddress);
-    rate = settingsContract.getTokenRate(beneficiary);
-    if (!alreadyDeposited(beneficiary)) {
-      investors.push(beneficiary);
+    uint256 currTime = now;
+    uint256 stageCap = toBRFWEI(getStageCap(currTime));
+    rate = getTokenRate(currTime);
+    uint256 stage = getStage(currTime);
+    uint256 weiAmount = msg.value;
+    uint256 tokenToGet = weiAmount.mul(rate);
+    if (totalTokensByStage[stage].add(tokenToGet) > stageCap) {
+      stage = stage + 1;
+      rate = getRateByStage(stage);
+      tokenToGet = weiAmount.mul(rate);
     }
+
+    require((tokenToGet >= MINIMUM_PURCHASE));
+
+    if (!containsAddress(beneficiary, directInvestors)) {
+      directInvestors.push(beneficiary);
+    }
+    totalTokensByStage[stage] = totalTokensByStage[stage].add(tokenToGet);
     super.buyTokens(beneficiary);
   }
 
   function refundInvestors() public onlyOwner {
     require(isFinalized);
     require(!goalReached());
-    for (uint256 i = 0; i < investors.length; i++) {
-      vault.refund(investors[i]);
+    for (uint256 i = 0; i < directInvestors.length; i++) {
+      vault.refund(directInvestors[i]);
     }
   }
 
-  function getInvestorCount() public view returns(uint256) {
-    return investors.length;
+  function burnUnsold() public onlyOwner {
+    require(isFinalized);
+    BRFToken brfToken = BRFToken(token);
+    brfToken.burn(brfToken.balanceOf(address(0)));
   }
 
-  function createTokenContract() internal returns (MintableToken) {
-    return new BRFToken();
+  function getTokenRate(uint256 currTime) public view returns (uint256) {
+    return getRateByStage(getStage(currTime));
   }
 
-  function alreadyDeposited(address depositor) internal view returns(bool) {
-    for (uint256 i = 0; i < investors.length; i++) {
-      if (investors[i] == depositor) {
+  function getStageCap(uint256 currTime) public view returns (uint256) {
+    return getCapByStage(getStage(currTime));
+  }
+
+  function getStage(uint256 currTime) public view returns (uint256) {
+    if (currTime < icoEndTimes[0]) {
+      return 0;
+    } else if ((currTime > icoEndTimes[0]) && (currTime <= icoEndTimes[1])) {
+      return 1;
+    } else {
+      return 2;
+    }
+  }
+
+  function getCapByStage(uint256 stage) public view returns (uint256) {
+    return icoCaps[stage];
+  }
+
+  function getRateByStage(uint256 stage) public view returns (uint256) {
+    return icoRates[stage];
+  }
+
+  function containsAddress(address needle, address[] hayStack) internal view returns(bool) {
+    for (uint256 i = 0; i < hayStack.length; i++) {
+      if (hayStack[i] == needle) {
         return true;
       }
     }
     return false;
   }
 
+  function toBRFWEI(uint256 value) internal view returns (uint256) {
+    BRFToken brfToken = BRFToken(token);
+    return (value * (10 ** uint256(brfToken.decimals())));
+  }
+
+  function finalization() internal {
+    super.finalization();
+    if (goalReached()) {
+      BRFToken brfToken = BRFToken(token);
+      brfToken.releaseTokenTransfer();
+    }
+  }
 }
