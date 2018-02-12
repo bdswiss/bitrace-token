@@ -642,8 +642,8 @@ contract BRFCrowdsale is RefundableCrowdsale {
   uint256[3] public icoCaps;
   uint256 public managementTokenAllocation;
   address public managementWalletAddress;
-  uint256 public bountryTokenAllocation;
-  address public bountryManagementWalletAddress;
+  uint256 public bountyTokenAllocation;
+  address public bountyManagementWalletAddress;
   bool public contractInitialized = false;
   address[] public directInvestors;
   mapping(address => uint256) public indirectInvestors;
@@ -661,8 +661,8 @@ contract BRFCrowdsale is RefundableCrowdsale {
     uint256 _goal,
     uint256 _managementTokenAllocation,
     address _managementWalletAddress,
-    uint256 _bountryTokenAllocation,
-    address _bountryManagementWalletAddress
+    uint256 _bountyTokenAllocation,
+    address _bountyManagementWalletAddress
     ) public
     Crowdsale(_icoStartTimes[0], _icoEndTimes[2], _icoRates[0], _wallet, new BRFToken())
     RefundableCrowdsale(_goal)
@@ -672,15 +672,15 @@ contract BRFCrowdsale is RefundableCrowdsale {
     require((_icoEndTimes[0] > _icoStartTimes[0]) && (_icoEndTimes[1] > _icoStartTimes[1]) && (_icoEndTimes[2] > _icoStartTimes[2]));
     require((_icoStartTimes[1] >= _icoEndTimes[0]) && (_icoStartTimes[2] >= _icoEndTimes[1]));
     require(_managementWalletAddress != owner && _wallet != _managementWalletAddress);
-    require(_bountryManagementWalletAddress != owner && _wallet != _bountryManagementWalletAddress);
+    require(_bountyManagementWalletAddress != owner && _wallet != _bountyManagementWalletAddress);
     icoStartTimes = _icoStartTimes;
     icoEndTimes = _icoEndTimes;
     icoRates = _icoRates;
     icoCaps = _icoCaps;
     managementTokenAllocation = _managementTokenAllocation;
     managementWalletAddress = _managementWalletAddress;
-    bountryTokenAllocation = _bountryTokenAllocation;
-    bountryManagementWalletAddress = _bountryManagementWalletAddress;
+    bountyTokenAllocation = _bountyTokenAllocation;
+    bountyManagementWalletAddress = _bountyManagementWalletAddress;
   }
 
   // fallback function can be used to buy tokens
@@ -692,10 +692,10 @@ contract BRFCrowdsale is RefundableCrowdsale {
   function initializeContract() public onlyOwner {
     require(!contractInitialized);
     allocateTokens(managementWalletAddress, managementTokenAllocation, 0, 0);
-    allocateTokens(bountryManagementWalletAddress, bountryTokenAllocation, 0, 0);
+    allocateTokens(bountyManagementWalletAddress, bountyTokenAllocation, 0, 0);
     BRFToken brfToken = BRFToken(token);
     brfToken.setTransferAgent(managementWalletAddress, true);
-    brfToken.setTransferAgent(bountryManagementWalletAddress, true);
+    brfToken.setTransferAgent(bountyManagementWalletAddress, true);
     contractInitialized = true;
   }
 
@@ -748,7 +748,13 @@ contract BRFCrowdsale is RefundableCrowdsale {
   function burnUnsold() public onlyOwner {
     require(isFinalized);
     BRFToken brfToken = BRFToken(token);
-    brfToken.burn(brfToken.balanceOf(address(0)));
+    brfToken.burn(brfToken.balanceOf(address(this)));
+  }
+
+  function advanceEndTime(uint256 newEndTime) public onlyOwner {
+    require(!isFinalized);
+    require(newEndTime > endTime);
+    endTime = newEndTime;
   }
 
   function getTokenRate(uint256 currTime) public view returns (uint256) {
@@ -796,6 +802,7 @@ contract BRFCrowdsale is RefundableCrowdsale {
     if (goalReached()) {
       BRFToken brfToken = BRFToken(token);
       brfToken.releaseTokenTransfer();
+      brfToken.transferOwnership(owner);
     }
   }
 }
