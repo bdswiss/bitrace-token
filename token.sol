@@ -754,9 +754,9 @@ contract BRFCrowdsale is RefundableCrowdsale {
   }
 
   function allocateUnsold() internal {
-    require(isFinalized);
+    require(hasEnded());
     BRFToken brfToken = BRFToken(token);
-    brfToken.transfer(owner, brfToken.balanceOf(address(this)));
+    token.transfer(owner, brfToken.balanceOf(address(this)));
   }
 
   function toBRFWEI(uint256 value) internal view returns (uint256) {
