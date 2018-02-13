@@ -500,7 +500,7 @@ contract RefundableCrowdsale is FinalizableCrowdsale {
  * Licensed under the Apache License, version 2.0: https://github.com/TokenMarketNet/ico/blob/master/LICENSE.txt
  */
 
-pragma solidity ^0.4.8;
+pragma solidity ^0.4.18;
 
 
 
@@ -525,11 +525,8 @@ contract ReleasableToken is ERC20, Ownable {
    *
    */
   modifier canTransfer(address _sender) {
-
     if (!released) {
-      if (!transferAgents[_sender]) {
-        revert();
-      }
+      require(transferAgents[_sender]);
     }
 
     _;
@@ -564,17 +561,13 @@ contract ReleasableToken is ERC20, Ownable {
 
   /** The function can be called only before or after the tokens have been released */
   modifier inReleaseState(bool releaseState) {
-    if (releaseState != released) {
-      revert();
-    }
+    require(releaseState == released);
     _;
   }
 
   /** The function can be called only by a whitelisted release agent. */
   modifier onlyReleaseAgent() {
-    if (msg.sender != releaseAgent) {
-      revert();
-    }
+    require(msg.sender == releaseAgent);
     _;
   }
 
@@ -590,35 +583,9 @@ contract ReleasableToken is ERC20, Ownable {
 
 }
 
-// File: zeppelin-solidity/contracts/token/BurnableToken.sol
-
-/**
- * @title Burnable Token
- * @dev Token that can be irreversibly burned (destroyed).
- */
-contract BurnableToken is BasicToken {
-
-    event Burn(address indexed burner, uint256 value);
-
-    /**
-     * @dev Burns a specific amount of tokens.
-     * @param _value The amount of token to be burned.
-     */
-    function burn(uint256 _value) public {
-        require(_value <= balances[msg.sender]);
-        // no need to require value <= totalSupply, since that would imply the
-        // sender's balance is greater than the totalSupply, which *should* be an assertion failure
-
-        address burner = msg.sender;
-        balances[burner] = balances[burner].sub(_value);
-        totalSupply = totalSupply.sub(_value);
-        Burn(burner, _value);
-    }
-}
-
 // File: contracts/BRFToken/BRFToken.sol
 
-contract BRFToken is StandardToken, ReleasableToken, BurnableToken {
+contract BRFToken is StandardToken, ReleasableToken {
   string public constant name = "BRF Token";
   string public constant symbol = "BRF";
   uint8 public constant decimals = 18;
@@ -629,7 +596,6 @@ contract BRFToken is StandardToken, ReleasableToken, BurnableToken {
     setReleaseAgent(msg.sender);
     setTransferAgent(msg.sender, true);
   }
-
 }
 
 // File: contracts/BRFToken/BRFCrowdsale.sol
@@ -645,10 +611,13 @@ contract BRFCrowdsale is RefundableCrowdsale {
   uint256 public bountyTokenAllocation;
   address public bountyManagementWalletAddress;
   bool public contractInitialized = false;
-  address[] public directInvestors;
-  mapping(address => uint256) public indirectInvestors;
   uint256 public constant MINIMUM_PURCHASE = 100;
   mapping(uint256 => uint256) public totalTokensByStage;
+  bool public refundingComplete = false;
+  uint256 public refundingIndex = 0;
+  mapping(address => uint256) public directInvestors;
+  mapping(address => uint256) public indirectInvestors;
+  address[] private directInvestorsCollection;
 
   event TokenAllocated(address indexed beneficiary, uint256 tokensAllocated, uint256 amount);
 
@@ -730,9 +699,10 @@ contract BRFCrowdsale is RefundableCrowdsale {
 
     require((tokenToGet >= MINIMUM_PURCHASE));
 
-    if (!containsAddress(beneficiary, directInvestors)) {
-      directInvestors.push(beneficiary);
+    if (directInvestors[beneficiary] == 0) {
+      directInvestorsCollection.push(beneficiary);
     }
+    directInvestors[beneficiary] = directInvestors[beneficiary].add(tokenToGet);
     totalTokensByStage[stage] = totalTokensByStage[stage].add(tokenToGet);
     super.buyTokens(beneficiary);
   }
@@ -740,15 +710,15 @@ contract BRFCrowdsale is RefundableCrowdsale {
   function refundInvestors() public onlyOwner {
     require(isFinalized);
     require(!goalReached());
-    for (uint256 i = 0; i < directInvestors.length; i++) {
-      vault.refund(directInvestors[i]);
+    require(!refundingComplete);
+    for (uint256 i = 0; i < 20; i++) {
+      if (refundingIndex >= directInvestorsCollection.length) {
+        refundingComplete = true;
+        break;
+      }
+      vault.refund(directInvestorsCollection[refundingIndex]);
+      refundingIndex = refundingIndex.add(1);
     }
-  }
-
-  function burnUnsold() public onlyOwner {
-    require(isFinalized);
-    BRFToken brfToken = BRFToken(token);
-    brfToken.burn(brfToken.balanceOf(address(this)));
   }
 
   function advanceEndTime(uint256 newEndTime) public onlyOwner {
@@ -783,13 +753,10 @@ contract BRFCrowdsale is RefundableCrowdsale {
     return icoRates[stage];
   }
 
-  function containsAddress(address needle, address[] hayStack) internal view returns(bool) {
-    for (uint256 i = 0; i < hayStack.length; i++) {
-      if (hayStack[i] == needle) {
-        return true;
-      }
-    }
-    return false;
+  function allocateUnsold() internal {
+    require(isFinalized);
+    BRFToken brfToken = BRFToken(token);
+    brfToken.transfer(owner, brfToken.balanceOf(address(this)));
   }
 
   function toBRFWEI(uint256 value) internal view returns (uint256) {
@@ -800,6 +767,7 @@ contract BRFCrowdsale is RefundableCrowdsale {
   function finalization() internal {
     super.finalization();
     if (goalReached()) {
+      allocateUnsold();
       BRFToken brfToken = BRFToken(token);
       brfToken.releaseTokenTransfer();
       brfToken.transferOwnership(owner);
